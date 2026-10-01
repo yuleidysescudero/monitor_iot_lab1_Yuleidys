@@ -29,9 +29,9 @@ python -m unittest discover -s pruebas -v   # pruebas unitarias
 | `alertas/sonidos.py` | Convierte las notas de `config.py` en archivos WAV y los reproduce con `PlaySound(..., SND_ASYNC)`, que regresa de inmediato |
 | `alertas/reproductor.py` | Cola `deque(maxlen=N)` + marcas de tiempo: decide **cuándo** suena cada alerta sin `time.sleep()` |
 | `alertas/gestor.py` | Suscriptor del despachador: decide **qué** sonido corresponde a cada evento |
-| `sensores/conexion.py` | Nuevo sensor: ¿hay ruta de salida a la red? (socket UDP, no envía paquetes) |
+| `sensores/conexion.py` | Nuevo sensor: ¿hay ruta de salida (socket UDP, no envía paquetes) y el adaptador tiene enlace? |
 | `eventos/conexion.py` | `red_desconectada` / `red_conectada` (flanco) y `red_sigue_desconectada` (tiempo), reutilizando `DetectorFlanco` y `DetectorTiempo` sin modificarlos |
-| `pruebas/` | 32 pruebas con `unittest` |
+| `pruebas/` | 33 pruebas con `unittest` |
 
 ## Alertas sonoras
 

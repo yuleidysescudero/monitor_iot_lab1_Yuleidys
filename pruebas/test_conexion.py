@@ -82,6 +82,17 @@ class PruebasSensorConexion(unittest.TestCase):
         self.assertFalse(lectura["conectado"])
         self.assertEqual(lectura["valor"], 0.0)
 
+    def test_ruta_vieja_con_wifi_sin_enlace_es_desconectado(self):
+        """Caso real: tras apagar el Wi-Fi, Windows conserva la IP y la
+        ruta, pero el adaptador ya no tiene enlace (isup = False)."""
+        sin_enlace = mock.Mock(isup=False)
+        with mock.patch.object(conexion, "_interfaz_de", return_value="Wi-Fi"):
+            with mock.patch.object(conexion.psutil, "net_if_stats",
+                                   return_value={"Wi-Fi": sin_enlace}):
+                lectura = conexion.leer()
+        self.assertFalse(lectura["conectado"])
+        self.assertEqual(lectura["detalle"], "Wi-Fi sin enlace")
+
 
 if __name__ == "__main__":
     unittest.main()
