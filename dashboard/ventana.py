@@ -93,16 +93,15 @@ class Ventana:
         self.lbl_sonido.config(
             text="SONIDO: MODO SILENCIOSO" if e["silencioso"] else "SONIDO: ACTIVO",
             fg=AMARILLO if e["silencioso"] else "white")
+        partes = []
         if e["error"]:
-            sonando = f"audio no disponible: {e['error']}"
+            partes.append(f"audio no disponible: {e['error']}")
         elif e["actual"]:
             descripcion = self.nucleo.alertas.reproductor.catalogo[e["actual"]]["descripcion"]
-            sonando = f"♪ {'(silencio) ' if e['silencioso'] else ''}{descripcion}"
-        else:
-            sonando = ""
+            partes.append(f"♪ {'(silencio) ' if e['silencioso'] else 'Sonando: '}{descripcion}")
         if e["pendientes"]:
-            sonando += f"   |   en cola: {len(e['pendientes'])}"
-        self.lbl_sonando.config(text=sonando, fg=AMARILLO)
+            partes.append(f"en cola: {len(e['pendientes'])}")
+        self.lbl_sonando.config(text="   |   ".join(partes), fg=AMARILLO)
 
     # ----------------------------------------------------------
     def _tarjetas(self):

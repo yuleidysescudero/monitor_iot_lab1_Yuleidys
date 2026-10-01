@@ -107,7 +107,9 @@ def generar_trafico():                                                # LABORATO
     print(f"Descargando datos de prueba desde {config.URL_TRAFICO} ...")
     total = 0
     try:
-        with urllib.request.urlopen(config.URL_TRAFICO, timeout=10) as r:
+        pedido = urllib.request.Request(config.URL_TRAFICO,
+                                        headers={"User-Agent": "monitor-iot-lab1"})
+        with urllib.request.urlopen(pedido, timeout=10) as r:
             while bloque := r.read(256 * 1024):
                 total += len(bloque)
     except OSError as e:

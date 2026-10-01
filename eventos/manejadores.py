@@ -17,14 +17,21 @@ ETIQUETAS = {
 }
 
 
+def _unidad(sensor):                                                  # LABORATORIO
+    """La red se mide en KB/s, no en %: se toma la unidad de config.py."""
+    return config.UMBRALES.get(sensor, {}).get("unidad", "%")
+
+
 def umbral_superado(d):
     nombre = ETIQUETAS.get(d["sensor"], d["sensor"])
-    return _evento(config.ALERTA, f"{nombre} al {d['valor']:.1f}% (umbral {d['umbral']:.0f}%)")
+    u = _unidad(d["sensor"])                                          # LABORATORIO
+    return _evento(config.ALERTA, f"{nombre} al {d['valor']:.1f} {u} (umbral {d['umbral']:.0f} {u})")  # LABORATORIO
 
 
 def umbral_normalizado(d):
     nombre = ETIQUETAS.get(d["sensor"], d["sensor"])
-    return _evento(config.INFO, f"{nombre} volvio a la normalidad ({d['valor']:.1f}%)")
+    return _evento(config.INFO, f"{nombre} volvio a la normalidad "
+                                f"({d['valor']:.1f} {_unidad(d['sensor'])})")  # LABORATORIO
 
 
 def flanco(d):
