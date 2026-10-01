@@ -28,6 +28,16 @@ FILAS = [
 ]
 
 
+def _linea_alertas(nucleo):                                           # LABORATORIO
+    """Estado de la red y del reproductor de alertas, en una linea."""
+    e = nucleo.estado_alertas()
+    red = {True: f"CONECTADA ({e['red_detalle']})", False: "*** DESCONECTADA ***",
+           None: "verificando..."}[e["conectado"]]
+    sonido = "SILENCIO" if e["silencioso"] else "ACTIVO"
+    actual = nucleo.alertas.reproductor.catalogo[e["actual"]]["descripcion"] if e["actual"] else "-"
+    print(f" Red: {red} | Sonido: {sonido} | Sonando: {actual} | En cola: {len(e['pendientes'])}")
+
+
 def ejecutar(nucleo):
     print("Iniciando nodo... Ctrl+C para terminar")
     try:
@@ -37,6 +47,8 @@ def ejecutar(nucleo):
                 datos = nucleo.instantanea()
                 print(f" {config.ESTUDIANTE} | Cedula {config.CEDULA} | Grupo {config.SALON}")
                 print("=" * 70)
+                _linea_alertas(nucleo)                                # LABORATORIO
+                print("-" * 70)                                       # LABORATORIO
                 for clave, titulo in FILAS:
                     d = datos.get(clave)
                     if not d or not d["ok"]:
@@ -59,6 +71,6 @@ def ejecutar(nucleo):
                     print(f"  {e['hora']} [{e['nivel']:<6}] {e['mensaje'][:60]}")
                 print("-" * 70)
                 print(" Ctrl+C para terminar")
-            time.sleep(0.2)
+            time.sleep(config.PAUSA_CONSOLA_S)                        # LABORATORIO: el 0.2 paso a config.py
     except KeyboardInterrupt:
         print("\nNodo detenido por el usuario.")

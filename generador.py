@@ -10,6 +10,10 @@ Se ejecuta en una terminal aparte, con el monitor ya abierto en otra.
 import multiprocessing
 import os
 import time
+import urllib.request                    # LABORATORIO
+
+import psutil                            # LABORATORIO
+import config                            # LABORATORIO
 
 
 # ---------------------------------------------------------------
@@ -70,6 +74,47 @@ def abrir_cerrar_procesos(cantidad=5):
     print("Procesos cerrados.")
 
 
+# ---------------------------------------------------------------
+# LABORATORIO: pruebas en vivo de las alertas sonoras
+# ---------------------------------------------------------------
+def memoria_hasta_umbral(segundos=20):                                # LABORATORIO
+    """Ocupa la RAM justo por encima del umbral 'alto' de config.py.
+    Con mucha RAM, una cantidad fija de MB no alcanza el umbral."""
+    v = psutil.virtual_memory()
+    objetivo = min(config.UMBRALES["memoria"]["alto"] + config.MARGEN_MEMORIA_PCT,
+                   config.TOPE_MEMORIA_PCT)
+    faltan = int((objetivo / 100 * v.total - (v.total - v.available)) / 1048576)
+    if faltan <= 0:
+        print("La memoria ya esta por encima del umbral.")
+        return
+    print(f"RAM al {v.percent:.0f}%. Ocupando ~{faltan} MB para llegar al {objetivo:.0f}% "
+          f"durante {segundos} s...")
+    bloques = []
+    try:
+        for _ in range(faltan // 50):
+            bloques.append(b"x" * (50 * 1024 * 1024))   # se escribe: ocupa RAM real
+        print(f"RAM al {psutil.virtual_memory().percent:.0f}%.")
+        time.sleep(segundos)
+    except MemoryError:
+        print("El sistema no permitio reservar mas memoria.")
+    finally:
+        bloques.clear()
+        print("Memoria liberada.")
+
+
+def generar_trafico():                                                # LABORATORIO
+    """Descarga un archivo de prueba y lo descarta: sube los KB/s de red."""
+    print(f"Descargando datos de prueba desde {config.URL_TRAFICO} ...")
+    total = 0
+    try:
+        with urllib.request.urlopen(config.URL_TRAFICO, timeout=10) as r:
+            while bloque := r.read(256 * 1024):
+                total += len(bloque)
+    except OSError as e:
+        print(f"No se pudo descargar (sin red?): {e}")
+    print(f"Descarga terminada: {total / 1048576:.0f} MB.")
+
+
 def secuencia_completa():
     cargar_cpu(12)
     time.sleep(4)
@@ -86,10 +131,13 @@ MENU = """
   3. Llenar disco temporal          (evento por umbral)
   4. Abrir y cerrar procesos        (evento por aparicion/desaparicion)
   5. Secuencia completa
+  6. Ocupar RAM hasta el umbral     (alerta sonora de memoria)   [LABORATORIO]
+  7. Generar trafico de red         (alerta sonora de trafico)   [LABORATORIO]
   0. Salir
 
 Recuerda: el cargador de la laptop se conecta y desconecta a mano;
 ese es el evento de flanco y no necesita este programa.
+Para red_desconectada / red_conectada: apaga y enciende el Wi-Fi. [LABORATORIO]
 """
 
 
@@ -107,6 +155,10 @@ def main():
             abrir_cerrar_procesos()
         elif opcion == "5":
             secuencia_completa()
+        elif opcion == "6":                  # LABORATORIO
+            memoria_hasta_umbral()
+        elif opcion == "7":                  # LABORATORIO
+            generar_trafico()
         elif opcion == "0":
             break
         else:

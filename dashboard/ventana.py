@@ -17,7 +17,10 @@ VERDE = "#4caf50"
 NARANJA = "#ff9800"
 ROJO = "#f44336"
 
-COLOR_NIVEL = {config.INFO: "#9aa7b8", config.AVISO: "#d9a441", config.ALERTA: "#e05c5c"}
+COLOR_NIVEL = {config.INFO: "#9aa7b8", config.AVISO: "#d9a441", config.ALERTA: "#e05c5c",
+               config.SONIDO: "#c792ea"}          # LABORATORIO: color de las alertas sonoras
+MORADO = "#7e57c2"                                 # LABORATORIO
+AMARILLO = "#ffd54f"                               # LABORATORIO
 
 TARJETAS = [
     ("cpu", "Uso de CPU"),
@@ -34,10 +37,11 @@ class Ventana:
         self.nucleo = nucleo
         self.raiz = tk.Tk()
         self.raiz.title(f"Nodo de telemetria - {config.NOMBRE_NODO}")
-        self.raiz.geometry("1120x640")
+        self.raiz.geometry("1120x680")      # LABORATORIO: espacio para la franja de alertas
         self.raiz.configure(bg=FONDO)
         self.widgets = {}
         self._encabezado()
+        self._franja_alertas()              # LABORATORIO
         self._tarjetas()
         self._paneles()
         self._botones()
@@ -59,6 +63,46 @@ class Ventana:
         self.estado = tk.Label(barra, text="MONITOREANDO", font=("Segoe UI", 9, "bold"),
                                fg="#2e7d32", bg="white")
         self.estado.pack(side="right", padx=10)
+
+    # ----------------------------------------------------------
+    # LABORATORIO: franja con el estado de la red y del sonido
+    # ----------------------------------------------------------
+    def _franja_alertas(self):                                        # LABORATORIO
+        self.franja = tk.Frame(self.raiz, bg=AZUL, padx=12, pady=5)
+        self.franja.pack(fill="x")
+        estilo = {"font": ("Segoe UI", 9, "bold"), "bg": AZUL, "fg": "white"}
+        self.lbl_red = tk.Label(self.franja, text="RED: verificando...", **estilo)
+        self.lbl_red.pack(side="left")
+        self.lbl_sonido = tk.Label(self.franja, text="", **estilo)
+        self.lbl_sonido.pack(side="left", padx=24)
+        self.lbl_sonando = tk.Label(self.franja, text="", **estilo)
+        self.lbl_sonando.pack(side="right")
+        self.widgets_franja = (self.franja, self.lbl_red, self.lbl_sonido, self.lbl_sonando)
+
+    def _actualizar_franja(self):                                     # LABORATORIO
+        e = self.nucleo.estado_alertas()
+        if e["conectado"] is False:
+            fondo, texto = ROJO, "● RED DESCONECTADA"
+        elif e["conectado"]:
+            fondo, texto = AZUL, f"● RED CONECTADA  ·  {e['red_detalle']}"
+        else:
+            fondo, texto = AZUL, "RED: verificando..."
+        for w in self.widgets_franja:
+            w.config(bg=fondo)
+        self.lbl_red.config(text=texto)
+        self.lbl_sonido.config(
+            text="SONIDO: MODO SILENCIOSO" if e["silencioso"] else "SONIDO: ACTIVO",
+            fg=AMARILLO if e["silencioso"] else "white")
+        if e["error"]:
+            sonando = f"audio no disponible: {e['error']}"
+        elif e["actual"]:
+            descripcion = self.nucleo.alertas.reproductor.catalogo[e["actual"]]["descripcion"]
+            sonando = f"♪ {'(silencio) ' if e['silencioso'] else ''}{descripcion}"
+        else:
+            sonando = ""
+        if e["pendientes"]:
+            sonando += f"   |   en cola: {len(e['pendientes'])}"
+        self.lbl_sonando.config(text=sonando, fg=AMARILLO)
 
     # ----------------------------------------------------------
     def _tarjetas(self):
@@ -116,6 +160,8 @@ class Ventana:
             ("Pausar / Reanudar", self.pausar),
             ("Generar reporte", self.reporte),
             ("Limpiar bitacora", self.limpiar),
+            ("Silenciar / Activar sonido", self.alternar_sonido),     # LABORATORIO
+            ("Probar sonidos", self.nucleo.probar_sonidos),           # LABORATORIO
             ("Salir", self.raiz.destroy),
         ]
         for texto, accion in acciones:
@@ -141,6 +187,9 @@ class Ventana:
         self.nucleo.bitacora.limpiar()
         self.log.delete("1.0", "end")
 
+    def alternar_sonido(self):                                        # LABORATORIO
+        self.nucleo.alternar_silencio()
+
     # ----------------------------------------------------------
     def _pintar_barra(self, canvas, porcentaje):
         canvas.delete("all")
@@ -153,6 +202,7 @@ class Ventana:
     def _refrescar(self):
         self.nucleo.paso()
         self.reloj.config(text=time.strftime("%H:%M:%S"))
+        self._actualizar_franja()                                     # LABORATORIO
         datos = self.nucleo.instantanea()
 
         for clave, _ in TARJETAS:
@@ -189,7 +239,7 @@ class Ventana:
             self.log.insert("end", f"{e['hora']} [{e['nivel']:<6}] {e['mensaje']}\n", e["nivel"])
         self.log.see("end")
 
-        self.raiz.after(500, self._refrescar)
+        self.raiz.after(config.REFRESCO_MS, self._refrescar)          # LABORATORIO: el 500 paso a config.py
 
     def iniciar(self):
         self.raiz.mainloop()

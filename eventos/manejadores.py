@@ -90,6 +90,27 @@ def desconocido(d):
     return _evento(config.INFO, f"Evento sin manejador: {d}")
 
 
+# ---- LABORATORIO: eventos de conexion de red y de alertas sonoras ----
+def red_desconectada(d):                                              # LABORATORIO
+    origen = f" (salia por {d['interfaz']})" if d.get("interfaz") else ""
+    return _evento(config.ALERTA, f"Conexion de red perdida{origen}")
+
+
+def red_conectada(d):                                                 # LABORATORIO
+    return _evento(config.INFO, f"Conexion de red recuperada por {d.get('interfaz')} "
+                                f"tras {d['segundos']:.0f} s sin red")
+
+
+def red_sigue_desconectada(d):                                        # LABORATORIO
+    return _evento(config.AVISO, f"La red sigue desconectada "
+                                 f"({d['segundos']:.0f} s sin conexion)")
+
+
+def alerta_sonora(d):                                                 # LABORATORIO
+    modo = " [modo silencioso: no suena]" if d.get("silencio") else ""
+    return _evento(config.SONIDO, f"Alerta sonora: {d['descripcion']}{modo}")
+
+
 # ---- tabla que consume el despachador ----
 TABLA = {
     "umbral_superado": umbral_superado,
@@ -106,4 +127,8 @@ TABLA = {
     "bateria_baja": bateria_baja,
     "inicio": inicio,
     "desconocido": desconocido,
+    "red_desconectada": red_desconectada,               # LABORATORIO
+    "red_conectada": red_conectada,                     # LABORATORIO
+    "red_sigue_desconectada": red_sigue_desconectada,   # LABORATORIO
+    "alerta_sonora": alerta_sonora,                     # LABORATORIO
 }

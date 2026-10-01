@@ -32,6 +32,7 @@ class Despachador:
         evento = funcion(datos)
         if evento:
             evento["tipo"] = tipo
+            evento["sensor"] = datos.get("sensor")   # LABORATORIO: las alertas sonoras distinguen cpu/memoria/red
             for s in self.suscriptores:
                 s(evento)
         return evento

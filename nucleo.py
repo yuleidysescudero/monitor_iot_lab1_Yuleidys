@@ -17,15 +17,22 @@ from eventos.detectores import (
     DetectorTiempo, DetectorFalla, DetectorConjunto, VentanaMovil,
 )
 from almacenamiento import Bitacora
+from eventos.conexion import MonitorConexion    # LABORATORIO
+from alertas import crear_alertas               # LABORATORIO
 
 
 class Nucleo:
-    def __init__(self):
+    def __init__(self, silencioso=None):        # LABORATORIO: parametro del modo silencioso
         self.bitacora = Bitacora()
         self.despachador = Despachador()
         for tipo, funcion in manejadores.TABLA.items():
             self.despachador.registrar(tipo, funcion)
         self.despachador.suscribir(self.bitacora.agregar)
+        # LABORATORIO: nueva reaccion a los eventos. El gestor de alertas se
+        # suscribe igual que la bitacora; sensores y detectores no cambian.
+        self.alertas = crear_alertas(silencioso)                    # LABORATORIO
+        self.despachador.suscribir(self.alertas.atender_evento)     # LABORATORIO
+        self.conexion = MonitorConexion()                           # LABORATORIO
 
         # --- detectores por umbral (con histeresis) ---
         self.umbrales = {
@@ -48,6 +55,7 @@ class Nucleo:
 
         self.lecturas = {}
         self.ultima_muestra = 0.0
+        self.ultima_lenta = None          # LABORATORIO: marca de los sensores lentos
         self.pausado = False
         self.bateria_avisada = False
 
@@ -59,18 +67,28 @@ class Nucleo:
                 modulo.leer()
             except Exception:
                 pass
-        time.sleep(0.3)
+        time.sleep(config.CALENTAMIENTO_S)     # LABORATORIO: el 0.3 paso a config.py
         self.despachador.emitir("inicio", {"sensores": ", ".join(SENSORES)})
 
     # ------------------------------------------------------------------
     def paso(self):
         """Se llama continuamente. Devuelve True si hubo muestreo en esta pasada."""
         ahora = time.time()
+        # LABORATORIO: el reproductor se atiende en CADA llamada, antes de
+        # decidir si toca muestrear, y aunque el monitoreo este en pausa.
+        self._atender_sonido(ahora)                                 # LABORATORIO
         if self.pausado or (ahora - self.ultima_muestra) < config.INTERVALO_MUESTREO:
             return False
         self.ultima_muestra = ahora
+        # LABORATORIO: los sensores caros solo se leen cada PERIODO_LENTO
+        toca_lento = (self.ultima_lenta is None
+                      or ahora - self.ultima_lenta >= config.PERIODO_LENTO)  # LABORATORIO
+        if toca_lento:                                                       # LABORATORIO
+            self.ultima_lenta = ahora                                        # LABORATORIO
 
         for nombre, modulo in SENSORES.items():
+            if nombre in config.SENSORES_LENTOS and not toca_lento:         # LABORATORIO
+                continue                                                     # LABORATORIO
             lectura = modulo.leer()
             self.lecturas[nombre] = lectura
 
@@ -97,6 +115,7 @@ class Nucleo:
                     self.despachador.emitir(*r)
 
         self._eventos_especiales()
+        self._eventos_conexion(ahora)                               # LABORATORIO
 
         # 3) evento por tiempo
         r = self.temporizador.revisar(ahora)
@@ -130,7 +149,7 @@ class Nucleo:
                 if v >= config.UMBRAL_NUCLEO_SATURADO and i not in self.nucleos_saturados:
                     self.nucleos_saturados.add(i)
                     self.despachador.emitir("nucleo_saturado", {"nucleo": i, "valor": v})
-                elif v < config.UMBRAL_NUCLEO_SATURADO - 15 and i in self.nucleos_saturados:
+                elif v < config.UMBRAL_NUCLEO_SATURADO - config.HISTERESIS_NUCLEO and i in self.nucleos_saturados:  # LABORATORIO
                     self.nucleos_saturados.discard(i)
                     self.despachador.emitir("nucleo_liberado", {"nucleo": i})
 
@@ -138,6 +157,41 @@ class Nucleo:
         if pro.get("ok"):
             for tipo, datos in self.conjunto_procesos.revisar(pro["pids"], pro["nombres"]):
                 self.despachador.emitir(tipo, datos)
+
+    # ------------------------------------------------------------------
+    # LABORATORIO: conexion de red y alertas sonoras
+    # ------------------------------------------------------------------
+    def _eventos_conexion(self, ahora):                             # LABORATORIO
+        con = self.lecturas.get("conexion", {})
+        if con.get("ok"):
+            for tipo, datos in self.conexion.revisar(con["conectado"], ahora,
+                                                     con.get("interfaz")):
+                self.despachador.emitir(tipo, datos)
+
+    def _atender_sonido(self, ahora):                               # LABORATORIO
+        """Si termino la alerta anterior, arranca la siguiente de la cola.
+        Regresa enseguida: el sonido lo toca el sistema operativo."""
+        reproductor = self.alertas.reproductor
+        nombre = reproductor.atender(ahora)
+        if nombre:
+            self.despachador.emitir("alerta_sonora", {
+                "sonido": nombre,
+                "descripcion": reproductor.catalogo[nombre]["descripcion"],
+                "silencio": reproductor.silencioso,
+            })
+
+    def alternar_silencio(self):                                    # LABORATORIO
+        return self.alertas.reproductor.alternar_silencio()
+
+    def probar_sonidos(self):                                       # LABORATORIO
+        self.alertas.probar()
+
+    def estado_alertas(self):                                       # LABORATORIO
+        """Lo que el dashboard necesita saber de la red y del sonido."""
+        estado = self.alertas.reproductor.estado()
+        estado["conectado"] = self.conexion.conectado()
+        estado["red_detalle"] = self.lecturas.get("conexion", {}).get("detalle", "")
+        return estado
 
     # ------------------------------------------------------------------
     def _guardar_reporte(self):
