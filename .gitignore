@@ -1,0 +1,7 @@
+entorno/
+__pycache__/
+*.pyc
+bitacora.json
+eventos.json
+alertas/generados/
+relleno_temporal.bin
